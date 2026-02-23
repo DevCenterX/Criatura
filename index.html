@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criatura Neural Cyan - Grande</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // DevCenterX
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width, height;
+        let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        let head = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+        let tentacles = [];
+        let stars = [];
+
+        function init() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            
+            stars = [];
+            for (let i = 0; i < 200; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 1.5,
+                    opacity: Math.random()
+                });
+            }
+
+            tentacles = [];
+            const tentacleCount = 65; 
+            for (let i = 0; i < tentacleCount; i++) {
+                tentacles.push(new Tentacle(i, tentacleCount));
+            }
+        }
+
+        class Tentacle {
+            constructor(index, total) {
+                this.index = index;
+                this.numSegments = Math.floor(40 + Math.random() * 25); 
+                this.spacing = 5.5; 
+                this.baseAngle = (Math.PI * 2 / total) * index;
+                this.segments = Array.from({ length: this.numSegments }, () => ({ x: head.x, y: head.y }));
+                this.hue = 190 + Math.random() * 20; 
+            }
+
+            update(time) {
+                const radius = 16; 
+                const currentBaseAngle = this.baseAngle + time * 0.0003;
+                
+                this.segments[0].x = head.x + Math.cos(currentBaseAngle) * radius;
+                this.segments[0].y = head.y + Math.sin(currentBaseAngle) * radius;
+
+                for (let i = 1; i < this.numSegments; i++) {
+                    const prev = this.segments[i - 1];
+                    const curr = this.segments[i];
+                    
+                    const dx = prev.x - curr.x;
+                    const dy = prev.y - curr.y;
+                    const angle = Math.atan2(dy, dx);
+                    
+                    const wiggle = Math.sin(time * 0.002 + i * 0.15 + this.index) * 1.5;
+                    
+                    curr.x = prev.x - Math.cos(angle) * this.spacing + Math.cos(angle + Math.PI / 2) * wiggle;
+                    curr.y = prev.y - Math.sin(angle) * this.spacing + Math.sin(angle + Math.PI / 2) * wiggle;
+                }
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.moveTo(this.segments[0].x, this.segments[0].y);
+                for (let i = 1; i < this.numSegments; i++) {
+                    ctx.lineTo(this.segments[i].x, this.segments[i].y);
+                }
+                
+                ctx.strokeStyle = `hsla(${this.hue}, 100%, 75%, 0.4)`;
+                ctx.lineWidth = 2; 
+                ctx.lineCap = 'round';
+                ctx.stroke();
+
+                const tip = this.segments[this.numSegments - 1];
+                ctx.beginPath();
+                ctx.arc(tip.x, tip.y, 3, 0, Math.PI * 2); 
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(tip.x, tip.y, 7, 0, Math.PI * 2); 
+                ctx.fillStyle = `hsla(${this.hue}, 100%, 80%, 0.2)`;
+                ctx.fill();
+            }
+        }
+
+        function drawCore() {
+            ctx.beginPath();
+            ctx.arc(head.x, head.y, 35, 0, Math.PI * 2); 
+            const grad = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, 35);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            grad.addColorStop(0.3, 'rgba(100, 220, 255, 0.8)');
+            grad.addColorStop(1, 'rgba(0, 150, 255, 0)');
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.arc(head.x, head.y, 8, 0, Math.PI * 2); 
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowBlur = 25; 
+            ctx.shadowColor = '#00ffff';
+            ctx.fill();
+            ctx.shadowBlur = 0; 
+        }
+
+        function drawStars() {
+            ctx.fillStyle = "white";
+            stars.forEach(star => {
+                ctx.globalAlpha = star.opacity * (0.5 + Math.sin(Date.now() * 0.001 + star.x) * 0.5);
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        function animate(time) {
+            ctx.fillStyle = '#05070a';
+            ctx.fillRect(0, 0, width, height);
+
+            drawStars();
+
+            head.x += (mouse.x - head.x) * 0.05;
+            head.y += (mouse.y - head.y) * 0.05;
+
+            ctx.globalCompositeOperation = 'screen';
+
+            tentacles.forEach(t => {
+                t.update(time);
+                t.draw();
+            });
+
+            drawCore();
+            
+            ctx.globalCompositeOperation = 'source-over';
+
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('mousemove', e => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        window.addEventListener('touchmove', e => {
+            mouse.x = e.touches[0].clientX;
+            mouse.y = e.touches[0].clientY;
+            e.preventDefault();
+        }, { passive: false });
+
+        window.addEventListener('resize', init);
+        
+        init();
+        animate(0);
+        // DevCenterX
+    </script>
+</body>
+</html>
